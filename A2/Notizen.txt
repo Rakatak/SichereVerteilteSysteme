@@ -1,0 +1,3 @@
+mac passwort --> mit SHA 256 Hashen --> HMAC SHA Schlüssel
+
+nachricht verschlüsseln
