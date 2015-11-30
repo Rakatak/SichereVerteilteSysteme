@@ -1,17 +1,24 @@
 import os
 from PIL import Image
-import binascii
+import argparse
 import numpy as np
 
-im = Image.open("Bild.bmp")
+parser = argparse.ArgumentParser(description='Hiding a text in an image.')
+parser.add_argument('text', metavar='Text', type=str,
+                   help='text to be hid in the image')
+parser.add_argument('image', metavar='Image', type=str,
+                   help='image in .bmp format')
+args = parser.parse_args()
+im = Image.open(args.image)
+plaintext = open(args.text, "rb").read()
 
-file = open("text.txt", "rb")
-
-def convertobits(file):
-    bytes = (ord(b) for b in file.read())
-    for b in bytes:
-        for i in xrange(8):
-            yield (b >> i) & 1
+def converWholeTextToBits(s):
+    result = []
+    for c in s:
+        bits = bin(ord(c))[2:]
+        bits = '00000000'[len(bits):] + bits
+        result.extend([int(b) for b in bits])
+    return result
 
 def replaceLowestBit(colorChannel, textBits):
     imageLength = len(colorChannel) * len(colorChannel[0])
@@ -22,30 +29,26 @@ def replaceLowestBit(colorChannel, textBits):
     for row in colorChannel:
         valueCount = 0
         for colorValue in row:
-            if i == length:
-                i = 0
-            listColor = list(str('{0:08b}'.format(colorValue)))
-            listColor[7] = textBits[i]
-            i += 1
-            finalColor = int(int(''.join(listColor), 2))
-            newColorChannel[rowCount][valueCount] = finalColor
-            #print "First Color  "+ str(colorValue)
-            #print "Final Color  "+ str(finalColor)
+            #print str(rowCount) + "  " + str(valueCount)
+            if i > length - 1:
+                newColorChannel[rowCount][valueCount] = colorValue
+            else:
+                binaryColor = list('{0:08b}'.format(colorValue))
+                binaryColor[7] = str(textBits[i])
+                i += 1
+                finalColor = int(int(''.join(binaryColor), 2))
+                newColorChannel[rowCount][valueCount] = finalColor
+                #print "First Color  "+ str(colorValue)
+                #print "Final Color  "+ str(finalColor)
             valueCount += 1
         rowCount += 1
-
+    print i
     return newColorChannel
 
-
-
-
-
 def main():
-    textBits = ''
     print "\nConverting Textfile into simple bits..."
-    for b in convertobits(file):
-        textBits += str(b)
-    print "Converting done. Result: " + textBits + "\n"
+    textBits = converWholeTextToBits(plaintext);
+    print "Converting done. Result: " + str(textBits) + "\n"
 
     print "Getting Image Data..."
     r, g, b = np.array(im).T
@@ -59,6 +62,8 @@ def main():
 
     print "Processing and saving Image...\n"
     finalImage = Image.fromarray(np.dstack([item.T for item in (r,g,b)]))
-    finalImage.save("bild.bmp")
+    finalImage.save("tempBild.bmp")
+    imageFile = "C:/Users/Robin/Uni/Master/SichereVerteilteSysteme/A2/tempBild.bmp"
+    os.rename(imageFile, "C:/Users/Robin/Uni/Master/SichereVerteilteSysteme/A2/bild.bmp.ste")
     print "Image saved.\n"
 main()
