@@ -5,6 +5,8 @@ from xtea import *
 import hmac
 import os
 import argparse
+from bitarray import bitarray
+
 __author__ = 'Rakatak'
 
 parser = argparse.ArgumentParser(description='Hiding a text in an image.')
@@ -32,7 +34,9 @@ def converWholeTextToBits(s):
         result.extend([int(b) for b in bits])
     return result
 
-def replaceLowestBit(colorChannel, textBits):
+
+
+def replaceLowestBits(colorChannel, textBits):
     imageLength = len(colorChannel) * len(colorChannel[0])
     length = min(imageLength, len(textBits))
     newColorChannel = np.zeros_like(colorChannel)
@@ -41,20 +45,14 @@ def replaceLowestBit(colorChannel, textBits):
     for row in colorChannel:
         valueCount = 0
         for colorValue in row:
-            #print str(rowCount) + "  " + str(valueCount)
             if i > length - 1:
                 newColorChannel[rowCount][valueCount] = colorValue
             else:
-                binaryColor = list('{0:08b}'.format(colorValue))
-                binaryColor[7] = str(textBits[i])
-                i += 1
-                finalColor = int(int(''.join(binaryColor), 2))
+                finalColor = (bitarray(colorValue) & ~1) | textBits[i]
                 newColorChannel[rowCount][valueCount] = finalColor
-                #print "First Color  "+ str(colorValue)
-                #print "Final Color  "+ str(finalColor)
+                i += 1
             valueCount += 1
         rowCount += 1
-    #print i
     return newColorChannel
 
 
@@ -85,6 +83,30 @@ def convertfromBits(bits):
         chars.append(chr(int(''.join([str(bit) for bit in byte]), 2)))
     return ''.join(chars)
 
+def replaceLowestBit(colorChannel, textBits):
+    imageLength = len(colorChannel) * len(colorChannel[0])
+    length = min(imageLength, len(textBits))
+    newColorChannel = np.zeros_like(colorChannel)
+    i = 0
+    rowCount = 0
+    for row in colorChannel:
+        valueCount = 0
+        for colorValue in row:
+            if i > length - 1:
+                newColorChannel[rowCount][valueCount] = colorValue
+            else:
+                binaryColor = list('{0:08b}'.format(colorValue))
+                binaryColor[7] = str(textBits[i])
+                i += 1
+                finalColor = int(int(''.join(binaryColor), 2))
+                newColorChannel[rowCount][valueCount] = finalColor
+                #print "First Color  "+ str(colorValue)
+                #print "Final Color  "+ str(finalColor)
+            valueCount += 1
+        rowCount += 1
+    #print i
+    return newColorChannel
+
 def authMac(mac, decryptedText):
     textMac = decryptedText[:32]
     textWithoutMac = decryptedText[32:]
@@ -93,10 +115,33 @@ def authMac(mac, decryptedText):
     print "Mac from User: " + a
     return hmac.compare_digest(a, textMac)
 
+def fillupText(plaintext):
+    fillingLength = 8 - (len(plaintext) % 8)
+    i = 0
+    print len(plaintext)
+    print fillingLength
+    if (fillingLength % 8 != 0):
+        while(i < fillingLength):
+            plaintext += "0"
+            i +=1
+    else:
+        fillingLength = 0
+    fillingLength *= 8
+    print len(plaintext)
+    return plaintext, fillingLength
+
+def defineLength(textLength):
+    stringLength = len(str(textLength))
+    standardLength = 8
+    diff = standardLength - stringLength
+    i = 0
+    #while
+
 def main():
 
     if args.e:
         plaintext = open(args.text, "rb").read()
+        #plaintext, fillingLength = fillupText(plaintext)
         im = Image.open(args.image)
 
         mac = createMAC(macpassword, plaintext)
@@ -128,11 +173,9 @@ def main():
         print "Processing and saving Image..."
         finalImage = Image.fromarray(np.dstack([item.T for item in (r,g,b)]))
         finalImage.save("encBild.bmp")
-        imageFile = "C:/Users/Robin/Uni/Master/SichereVerteilteSysteme/A2/encBild.bmp"
-        os.rename(imageFile, "C:/Users/Robin/Uni/Master/SichereVerteilteSysteme/A2/bild.bmp.sae")
+        imageFile = os.path.dirname(os.path.abspath(__file__)) + "\encBild.bmp"
+        os.rename(imageFile, os.path.dirname(os.path.abspath(__file__)) + "\\bild.bmp.sae")
         print "Image saved.\n"
-
-
 
     if args.d:
         print "Getting encrypted Image."
