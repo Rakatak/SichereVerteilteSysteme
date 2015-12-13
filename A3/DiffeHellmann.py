@@ -1,5 +1,5 @@
 __author__ = 'Rakatak'
-
+# given values
 p = 467
 g = 2
 a = 228
