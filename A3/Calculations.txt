@@ -1,0 +1,29 @@
+1
+.1)	a = 2, b = 5, p = 467, g = 2
+	A = 2^2 mod 467 = 4
+	B = 2^5 mod 467 = 32
+	s = 32^2 mod 467 = 90
+	s = 4^5 mod 467 = 90
+	
+.2)	a = 400, b = 134, p = 467, g = 2
+	A = 2^400 mod 467 = 137
+	B = 2^134 mod 467 = 84
+	s = 32^400 mod 467 = 90
+	s = 4^134 mod 467 = 90
+
+.3)	a = 228, b = 57, p = 467, g = 2
+	A = 2^228 mod 467 = 394
+	B = 2^57 mod 467 = 313
+	s = 32^228 mod 467 = 206
+	s = 4^57 mod 467 = 206
+		
+2)
+
+p = 5, q = 11, e = 3, m = 9
+n = 55
+phiN = 40
+d = 27
+Public key is (e, n) => (3, 55)
+Private key is (d, n) => (27, 55)
+Encrypted Message of 9 is 14
+Decrypted Message of 14 is 9
