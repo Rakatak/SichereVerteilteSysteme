@@ -1,15 +1,13 @@
-import base64, smtplib, imaplib, getpass, random
+import base64, smtplib, imaplib, getpass, random, hashlib, hmac
 from email.parser import Parser
 from email.mime.text import MIMEText
 from xtea import *
 
 
 def main():
-    personOne = {"email": "s63570@beuth-hochschule.de", "smtp": {"address": "smtp.beuth-hochschule.de", "port": 143}, "imap": {"address": "imap.beuth-hochschule.de"}}
+    personOne = {"email": "s63570@beuth-hochschule.de", "smtp": {"address": "smtp.beuth-hochschule.de", "port": 587}, "imap": {"address": "imap.beuth-hochschule.de"}}
     personTwo = {"email": "robin-steller@web.de", "smtp": {"address": "smtp.web.de", "port": 587}, "imap": {"address": "imap.web.de"}}
 
-
-    # actual script
     p = 467
     g = 2
 
@@ -18,47 +16,53 @@ def main():
 
     print "Send public keys..."
     publicKeyA = generateKey(g, a, p)
-    sendKey(personOne, personTwo, publicKeyA)
+    sendMail(personOne, personTwo, publicKeyA)
 
     publicKeyB = generateKey(g, b, p)
-    sendKey(personTwo, personOne, publicKeyB)
+    sendMail(personTwo, personOne, publicKeyB)
 
-    print "Receive public keys..."
-    pubA = receiveKey(personOne, personTwo)
+    print "\nReceive public keys..."
+    pubA = receiveMail(personOne, personTwo)
     privateKeyB = generateKey(int(pubA), b, p)
 
-    pubB = receiveKey(personTwo, personOne)
+    pubB = receiveMail(personTwo, personOne)
     privateKeyA = generateKey(int(pubB), a, p)
 
-    print "Send encrypted message from " + personOne["email"] + " to " + personTwo["email"] + "."
+    print "\nSend encrypted message from " + personOne["email"] + " to " + personTwo["email"] + "."
+    subject = raw_input("Please enter the subject: ")
     message = raw_input("Please enter the message: ")
 
-    print message
+    encryptedMessage = encryptionXteaCBCMode(privateKeyA, message)
 
-    privateKeyA = 90
+    print "\nSending message..."
+    sendMail(personOne, personTwo, encryptedMessage, subject)
 
-    iv = byteStringToString(charOrIntToByte(random.randrange(0, 2**64-1)).zfill(64))
-    encryptedMessage = new(privateKeyA, mode=MODE_CBC, IV=iv).encrypt(message)
+    print "\nReading message..."
+    message = receiveMail(personOne, personTwo)
+    decryptedMessage = decryptionXteaCBCMode(privateKeyB, message)
+
+    print "\nThe message is:"
+    print decryptedMessage
 
 
 def generateKey(basis, exponent, modulo):
     return str((basis**exponent) % modulo)
 
 
-def sendKey(sender, receiver, publicKey):
-    msg = publicKey
+def sendMail(sender, receiver, msg, subject="Public key"):
     msg = MIMEText(base64.b64encode(msg) + "\r\n")
+    print "Sending..."
 
-    print "sending..."
-    msg['Subject'] = "Public key"
+    msg['Subject'] = subject
     msg['From'] = sender["email"]
     msg['To'] = receiver["email"]
+    print "Sending..."
 
     s = smtplib.SMTP(sender["smtp"]["address"], sender["smtp"]["port"])
-    print "sending..."
+    print "Sending..."
 
     s.starttls()
-    print "sending..."
+    print "Sending..."
 
     pwd = getpass.getpass(prompt='Please enter the password for ' + sender["email"] + ': ')
 
@@ -74,7 +78,7 @@ def sendKey(sender, receiver, publicKey):
     s.quit()
 
 
-def receiveKey(sender, receiver):
+def receiveMail(sender, receiver):
     mail = imaplib.IMAP4_SSL(receiver["imap"]["address"])
     pwd = getpass.getpass(prompt='Please enter the password for ' + receiver["email"] + ': ')
 
@@ -118,6 +122,48 @@ def receiveKey(sender, receiver):
     return key
 
 
+def encryptionXteaCBCMode(key, message):
+    hashKey = sha256Hash(key, '')
+    hashKey = hashKey[:16]
+
+    originalMessageLength = len(message)
+    message = padding(message)
+
+    iv = byteStringToString(charOrIntToByte(random.randrange(0, 2**64-1)).zfill(64))
+
+    encryptedMessage = new(hashKey, mode=MODE_CFB, IV=iv).encrypt(message)
+    encryptedMessage = encryptedMessage[:originalMessageLength]
+    return iv + encryptedMessage
+
+
+def decryptionXteaCBCMode(key, cipherMessage):
+    hashKey = sha256Hash(key, '')
+    hashKey = hashKey[:16]
+
+    iv = cipherMessage[:8]
+    message = cipherMessage[8:]
+    originalMessageLength = len(message)
+    message = padding(message)
+
+    decryptedMessage = new(hashKey, mode=MODE_CFB, IV=iv).decrypt(message)
+    decryptedMessage = decryptedMessage[:originalMessageLength]
+
+    return decryptedMessage
+
+
+def padding(message):
+    paddedMessage = stringToByteString(message)
+    blockSize = 64
+    missingBits = blockSize - (len(paddedMessage) % blockSize)
+    if missingBits == 0:
+        paddedMessage += '1' + '0'*(blockSize - 1)
+    else:
+        paddedMessage += '1' + '0'*(missingBits-1)
+
+    paddedMessage = byteStringToString(paddedMessage)
+    return paddedMessage
+
+
 def byteStringToString(byteString):
     return byteArrayToString([byteString[i:i+8] for i in range(0, len(byteString), 8)])
 
@@ -140,6 +186,10 @@ def charOrIntToByte(ch):
     elif type(ch) is not int and type(ch) is not long:
         return 0
     return '{:08b}'.format(ch)
+
+
+def sha256Hash(key, message):
+    return hmac.new(key=key, msg=message, digestmod=hashlib.sha256).digest()
 
 
 if __name__ == "__main__":
